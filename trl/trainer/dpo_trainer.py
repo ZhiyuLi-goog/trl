@@ -941,6 +941,9 @@ class DPOTrainer(Trainer):
         else:
             max_length = max(batch["chosen_input_ids"].shape[1], batch["rejected_input_ids"].shape[1])
 
+        if max_length % 256 != 0:
+            max_length = (max_length // 256 + 1) * 256
+
         for k in batch:
             if k.startswith("chosen") and isinstance(batch[k], torch.Tensor):
                 if "labels" in k or is_encoder_decoder:
@@ -1114,7 +1117,10 @@ class DPOTrainer(Trainer):
         loss_mask = labels != label_pad_token_id
 
         # dummy token; we'll ignore the losses on these tokens later
-        labels[labels == label_pad_token_id] = 0
+
+        # switch to pytorch_xla friendly api
+        # labels[labels == label_pad_token_id] = 0
+        labels = labels.masked_fill(labels == label_pad_token_id, 0)
 
         per_token_logps = torch.gather(logits.log_softmax(-1), dim=2, index=labels.unsqueeze(2)).squeeze(2)
 
@@ -1215,7 +1221,6 @@ class DPOTrainer(Trainer):
                         _,
                         _,
                     ) = self.concatenated_forward(self.ref_model, batch)
-
         losses, chosen_rewards, rejected_rewards = self.dpo_loss(
             policy_chosen_logps,
             policy_rejected_logps,
@@ -1223,19 +1228,21 @@ class DPOTrainer(Trainer):
             reference_rejected_logps,
         )
         reward_accuracies = (chosen_rewards > rejected_rewards).float()
-
         if self.args.rpo_alpha is not None:
             losses = losses * self.args.rpo_alpha - policy_chosen_logps_avg
 
         prefix = "eval_" if train_eval == "eval" else ""
-        metrics[f"{prefix}rewards/chosen"] = chosen_rewards.mean().cpu()
-        metrics[f"{prefix}rewards/rejected"] = rejected_rewards.mean().cpu()
-        metrics[f"{prefix}rewards/accuracies"] = reward_accuracies.mean().cpu()
-        metrics[f"{prefix}rewards/margins"] = (chosen_rewards - rejected_rewards).mean().cpu()
-        metrics[f"{prefix}logps/rejected"] = policy_rejected_logps.detach().mean().cpu()
-        metrics[f"{prefix}logps/chosen"] = policy_chosen_logps.detach().mean().cpu()
-        metrics[f"{prefix}logits/rejected"] = policy_rejected_logits.detach().mean().cpu()
-        metrics[f"{prefix}logits/chosen"] = policy_chosen_logits.detach().mean().cpu()
+        # TODO
+        # mute metrics now since it trigger recompile in pytorch xla
+        # metrics[f"{prefix}rewards/chosen"] = chosen_rewards.mean().cpu()
+        # metrics[f"{prefix}rewards/rejected"] = rejected_rewards.mean().cpu()
+        # metrics[f"{prefix}rewards/accuracies"] = reward_accuracies.mean().cpu()
+        # metrics[f"{prefix}rewards/margins"] = (chosen_rewards - rejected_rewards).mean().cpu()
+        # metrics[f"{prefix}logps/rejected"] = policy_rejected_logps.detach().mean().cpu()
+        # metrics[f"{prefix}logps/chosen"] = policy_chosen_logps.detach().mean().cpu()
+        # metrics[f"{prefix}logits/rejected"] = policy_rejected_logits.detach().mean().cpu()
+        # metrics[f"{prefix}logits/chosen"] = policy_chosen_logits.detach().mean().cpu()
+        metrics = {}
 
         return losses.mean(), metrics
 
