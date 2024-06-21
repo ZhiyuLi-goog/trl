@@ -52,6 +52,7 @@ from .utils import (
     peft_module_casting_to_bf16,
     trl_sanitze_kwargs_for_tagging,
 )
+import gc
 
 
 if is_peft_available():
@@ -537,7 +538,11 @@ class DPOTrainer(Trainer):
             if self.is_deepspeed_enabled:
                 self.ref_model = self._prepare_deepspeed(self.ref_model)
             else:
+                self.ref_model = self.ref_model.to_empty(device="cpu")
                 self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
+                gc.collect()
+                self.model = self.model.to_empty(device="cpu")
+                gc.collect()
 
         if args.sync_ref_model:
             if precompute_ref_log_probs:
