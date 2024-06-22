@@ -367,6 +367,8 @@ class DPOTrainer(Trainer):
             )
             args.max_length = 512
 
+        self.max_length = args.max_length
+
         if max_prompt_length is not None:
             warnings.warn(
                 "You passed `max_prompt_length` to the DPOTrainer, the value you passed will override the one in the `DPOConfig`."
@@ -398,12 +400,13 @@ class DPOTrainer(Trainer):
                 "You passed `label_pad_token_id` to the DPOTrainer, the value you passed will override the one in the `DPOConfig`."
             )
             args.label_pad_token_id = label_pad_token_id
+
         if data_collator is None:
             data_collator = DPODataCollatorWithPadding(
                 pad_token_id=tokenizer.pad_token_id,
                 label_pad_token_id=args.label_pad_token_id,
                 is_encoder_decoder=self.is_encoder_decoder,
-                max_length=max_length,
+                max_length=self.max_length,
             )
 
             if args.remove_unused_columns:
@@ -942,9 +945,6 @@ class DPOTrainer(Trainer):
         else:
             max_length = max(batch["chosen_input_ids"].shape[1], batch["rejected_input_ids"].shape[1])
 
-        if max_length % 256 != 0:
-            max_length = (max_length // 256 + 1) * 256
-
         for k in batch:
             if k.startswith("chosen") and isinstance(batch[k], torch.Tensor):
                 if "labels" in k or is_encoder_decoder:
@@ -955,6 +955,7 @@ class DPOTrainer(Trainer):
                     pad_value = 0
                 concatenated_key = k.replace("chosen", "concatenated")
                 # concatenated_batch[concatenated_key] = pad_to_length(batch[k], max_length, pad_value=pad_value)
+                concatenated_batch[concatenated_key] = batch[k]
         for k in batch:
             if k.startswith("rejected") and isinstance(batch[k], torch.Tensor):
                 if "labels" in k or is_encoder_decoder:
