@@ -539,10 +539,12 @@ class DPOTrainer(Trainer):
                 self.ref_model = self._prepare_deepspeed(self.ref_model)
             else:
                 self.ref_model = self.ref_model.to_empty(device="cpu")
+                # self.ref_model.apply(self.ref_model._init_weights)
                 # self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
                 self.ref_model = ref_model = None
                 gc.collect()
                 self.model = self.model.to_empty(device="cpu")
+                self.model.apply(self.model._init_weights)
                 gc.collect()
 
         if args.sync_ref_model:
