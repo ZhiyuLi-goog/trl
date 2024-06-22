@@ -403,6 +403,7 @@ class DPOTrainer(Trainer):
                 pad_token_id=tokenizer.pad_token_id,
                 label_pad_token_id=args.label_pad_token_id,
                 is_encoder_decoder=self.is_encoder_decoder,
+                max_length=max_length,
             )
 
             if args.remove_unused_columns:
@@ -953,7 +954,7 @@ class DPOTrainer(Trainer):
                 elif k.endswith("_attention_mask"):
                     pad_value = 0
                 concatenated_key = k.replace("chosen", "concatenated")
-                concatenated_batch[concatenated_key] = pad_to_length(batch[k], max_length, pad_value=pad_value)
+                # concatenated_batch[concatenated_key] = pad_to_length(batch[k], max_length, pad_value=pad_value)
         for k in batch:
             if k.startswith("rejected") and isinstance(batch[k], torch.Tensor):
                 if "labels" in k or is_encoder_decoder:
@@ -966,7 +967,8 @@ class DPOTrainer(Trainer):
                 concatenated_batch[concatenated_key] = torch.cat(
                     (
                         concatenated_batch[concatenated_key],
-                        pad_to_length(batch[k], max_length, pad_value=pad_value),
+                        batch[k],
+                        # pad_to_length(batch[k], max_length, pad_value=pad_value),
                     ),
                     dim=0,
                 ).to(device=device)
@@ -1310,10 +1312,10 @@ class DPOTrainer(Trainer):
                         pad_token_id=self.tokenizer.pad_token_id,
                     )
 
-        policy_output = pad_to_length(policy_output, self.max_length, self.tokenizer.pad_token_id)
+        # policy_output = pad_to_length(policy_output, self.max_length, self.tokenizer.pad_token_id)
         policy_output_decoded = self.tokenizer.batch_decode(policy_output, skip_special_tokens=True)
 
-        reference_output = pad_to_length(reference_output, self.max_length, self.tokenizer.pad_token_id)
+        # reference_output = pad_to_length(reference_output, self.max_length, self.tokenizer.pad_token_id)
         reference_output_decoded = self.tokenizer.batch_decode(reference_output, skip_special_tokens=True)
 
         return policy_output_decoded, reference_output_decoded

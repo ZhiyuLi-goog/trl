@@ -352,6 +352,7 @@ class DPODataCollatorWithPadding:
     pad_token_id: int = 0
     label_pad_token_id: int = -100
     is_encoder_decoder: Optional[bool] = False
+    max_length: int = None
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         # first, pad everything to the same length
@@ -375,6 +376,10 @@ class DPODataCollatorWithPadding:
                         padding_value = self.label_pad_token_id
                     else:
                         raise ValueError(f"Unexpected key in batch '{k}'")
+
+                    if self.max_length:
+                        padded_batch[k] = pad_to_length(padded_batch[k], self.max_length, padding_value)
+
                     padded_batch[k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
                 else:
                     # adapted from https://stackoverflow.com/questions/73256206
@@ -397,6 +402,8 @@ class DPODataCollatorWithPadding:
                     else:
                         raise ValueError(f"Unexpected key in batch '{k}'")
 
+                    if self.max_length:
+                        padded_batch[k] = pad_to_length(padded_batch[k], self.max_length, padding_value)
                     padded_batch[k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
                     # for the prompt, flip back so padding is on left side
                     if "prompt" in k:
